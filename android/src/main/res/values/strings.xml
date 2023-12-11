@@ -2,4 +2,7 @@
     <string name="noTokenDialogTitle">Error: no mapbox access token</string>
     <string name="noTokenDialogBody">Please put your mapbox access token in res/values/mapbox_access_token.xml</string>
     <string name="was_navigation_stopped">false</string>
+    <string name="app_name">Navigation map</string>
+    <string name="user_location_permission_explanation">This app needs location permissions to show its functionality.</string>
+    <string name="user_location_permission_not_granted">You didn\'t grant location permissions.</string>
 </resources>

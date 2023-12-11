@@ -10,8 +10,7 @@ abstract class FlutterMapboxNavigationPlatform extends PlatformInterface {
 
   static final Object _token = Object();
 
-  static FlutterMapboxNavigationPlatform _instance =
-      MethodChannelFlutterMapboxNavigation();
+  static FlutterMapboxNavigationPlatform _instance = MethodChannelFlutterMapboxNavigation();
 
   /// The default instance of [FlutterMapboxNavigationPlatform] to use.
   ///
@@ -66,6 +65,7 @@ abstract class FlutterMapboxNavigationPlatform extends PlatformInterface {
   Future<bool?> startNavigation(
     List<WayPoint> wayPoints,
     MapBoxOptions options,
+    Map<String, dynamic>? predefinedRoute,
   ) async {
     throw UnimplementedError('startNavigation() has not been implemented.');
   }

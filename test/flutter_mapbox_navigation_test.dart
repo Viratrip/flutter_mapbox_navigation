@@ -5,15 +5,12 @@ import 'package:flutter_mapbox_navigation/src/flutter_mapbox_navigation_platform
 import 'package:flutter_test/flutter_test.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
-class MockFlutterMapboxNavigationPlatform
-    with MockPlatformInterfaceMixin
-    implements FlutterMapboxNavigationPlatform {
+class MockFlutterMapboxNavigationPlatform with MockPlatformInterfaceMixin implements FlutterMapboxNavigationPlatform {
   @override
   Future<String?> getPlatformVersion() => Future.value('42');
 
   @override
-  Future<dynamic> addWayPoints({required List<WayPoint> wayPoints}) =>
-      Future.value('');
+  Future<dynamic> addWayPoints({required List<WayPoint> wayPoints}) => Future.value('');
 
   @override
   Future<bool?> enableOfflineRouting() => Future.value(true);
@@ -34,6 +31,7 @@ class MockFlutterMapboxNavigationPlatform
   Future<bool?> startNavigation(
     List<WayPoint> wayPoints,
     MapBoxOptions options,
+    Map<String, dynamic>? predefinedRoute,
   ) =>
       Future.value();
 

@@ -62,8 +62,7 @@ class MapBoxNavigation {
   /// be inserted after the currently navigating waypoint
   /// in the existing navigation
   Future<dynamic> addWayPoints({required List<WayPoint> wayPoints}) async {
-    return FlutterMapboxNavigationPlatform.instance
-        .addWayPoints(wayPoints: wayPoints);
+    return FlutterMapboxNavigationPlatform.instance.addWayPoints(wayPoints: wayPoints);
   }
 
   /// Free-drive mode is a unique Mapbox Navigation SDK feature that allows
@@ -87,10 +86,10 @@ class MapBoxNavigation {
   Future<bool?> startNavigation({
     required List<WayPoint> wayPoints,
     MapBoxOptions? options,
+    Map<String, dynamic>? predefinedRoute,
   }) async {
     options ??= _defaultOptions;
-    return FlutterMapboxNavigationPlatform.instance
-        .startNavigation(wayPoints, options);
+    return FlutterMapboxNavigationPlatform.instance.startNavigation(wayPoints, options, predefinedRoute);
   }
 
   ///Ends Navigation and Closes the Navigation View
@@ -108,7 +107,6 @@ class MapBoxNavigation {
   Future<dynamic> registerRouteEventListener(
     ValueSetter<RouteEvent> listener,
   ) async {
-    return FlutterMapboxNavigationPlatform.instance
-        .registerRouteEventListener(listener);
+    return FlutterMapboxNavigationPlatform.instance.registerRouteEventListener(listener);
   }
 }

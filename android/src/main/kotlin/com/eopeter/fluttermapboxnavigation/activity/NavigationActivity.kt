@@ -20,6 +20,8 @@ import com.eopeter.fluttermapboxnavigation.utilities.CustomInfoPanelEndNavButton
 import com.eopeter.fluttermapboxnavigation.utilities.PluginUtilities
 import com.eopeter.fluttermapboxnavigation.utilities.PluginUtilities.Companion.sendEvent
 import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
+import com.mapbox.api.directions.v5.models.DirectionsResponse
 import com.mapbox.api.directions.v5.models.DirectionsRoute
 import com.mapbox.api.directions.v5.models.RouteOptions
 import com.mapbox.geojson.Point
@@ -49,6 +51,8 @@ import com.mapbox.navigation.core.trip.session.VoiceInstructionsObserver
 import com.mapbox.navigation.dropin.map.MapViewObserver
 import com.mapbox.navigation.dropin.navigationview.NavigationViewListener
 import com.mapbox.navigation.utils.internal.ifNonNull
+import java.io.File
+import java.io.InputStream
 
 class NavigationActivity : AppCompatActivity() {
     private var finishBroadcastReceiver: BroadcastReceiver? = null
@@ -180,8 +184,35 @@ class NavigationActivity : AppCompatActivity() {
         val p = intent.getSerializableExtra("waypoints") as? MutableList<Waypoint>
         if (p != null) points = p
         points.map { waypointSet.add(it) }
-        requestRoutes(waypointSet)
 
+        val predefinedRouteFileName = intent.getSerializableExtra("predefinedRoute") as? String
+
+        // Read the predefined route from file
+        if(predefinedRouteFileName!=null) {
+            val predefinedRoute = readAndDeleteJSONFromAsset(predefinedRouteFileName)
+            if (predefinedRoute != null) {
+                setNavigationRoutes(waypointSet, predefinedRoute)
+            } else {
+                requestRoutes(waypointSet)
+            }
+        } else {
+            requestRoutes(waypointSet)
+        }
+    }
+
+    fun readAndDeleteJSONFromAsset(fileName:String): Map<String, Any>? {
+        var json: String? = null
+        try {
+            val file = File(fileName)
+            json = file.bufferedReader().use { it.readText() }
+            file.delete();
+            // convert json string to Map using Gson
+            //return Gson().fromJson(json, Map::class.java)
+            return Gson().fromJson(json, object : TypeToken<HashMap<String, Any>>() {}.type)
+        } catch (ex: Exception) {
+            ex.printStackTrace()
+            return null
+        }
     }
 
     override fun onDestroy() {
@@ -208,6 +239,38 @@ class NavigationActivity : AppCompatActivity() {
             isNavigationInProgress = false
             sendEvent(MapBoxEvents.NAVIGATION_CANCELLED)
         }
+    }
+
+    private fun setNavigationRoutes(waypointSet: WaypointSet, predefinedRoute: Map<String, Any>) {
+        sendEvent(MapBoxEvents.ROUTE_BUILDING)
+
+        val jsonRoutes = JSONObject(predefinedRoute).toString()
+        val predefinedRouteObj = NavigationRoute.create(
+            DirectionsResponse.builder()
+                .routes(
+                    listOf(
+                        DirectionsRoute.fromJson(jsonRoutes)
+                    )
+                )
+                .code("200")
+                .build(),
+            routeOptions = RouteOptions
+                .builder()
+                .applyDefaultNavigationOptions()
+                .applyLanguageAndVoiceUnitOptions(this)
+                .coordinatesList(waypointSet.coordinatesList())
+                .language(FlutterMapboxNavigationPlugin.navigationLanguage)
+                .alternatives(FlutterMapboxNavigationPlugin.showAlternateRoutes)
+                .build(),
+        );
+
+        sendEvent(MapBoxEvents.ROUTE_BUILT)
+        if (predefinedRouteObj.isEmpty()) {
+            sendEvent(MapBoxEvents.ROUTE_BUILD_NO_ROUTES_FOUND)
+            return
+        }
+        binding.navigationView.api.routeReplayEnabled(FlutterMapboxNavigationPlugin.simulateRoute)
+        binding.navigationView.api.startActiveGuidance(predefinedRouteObj)
     }
 
     private fun requestRoutes(waypointSet: WaypointSet) {

@@ -53,6 +53,7 @@ class FlutterMapboxNavigationPlugin : FlutterPlugin, MethodCallHandler,
         lateinit var routes: List<DirectionsRoute>
         private var currentRoute: DirectionsRoute? = null
         val wayPoints: MutableList<Waypoint> = mutableListOf()
+        var predefinedRoute: Map<String, Any>? = null
 
         var showAlternateRoutes: Boolean = true
         var longPressDestinationEnabled: Boolean = true
@@ -187,7 +188,7 @@ class FlutterMapboxNavigationPlugin : FlutterPlugin, MethodCallHandler,
         wayPoints.clear()
 
         if (enableFreeDriveMode) {
-            checkPermissionAndBeginNavigation(wayPoints)
+            checkPermissionAndBeginNavigation(wayPoints,null)
             return
         }
 
@@ -200,10 +201,12 @@ class FlutterMapboxNavigationPlugin : FlutterPlugin, MethodCallHandler,
             val isSilent = point["IsSilent"] as Boolean
             wayPoints.add(Waypoint(name, longitude, latitude, isSilent))
         }
-        checkPermissionAndBeginNavigation(wayPoints)
+        predefinedRoute = arguments?.get("predefinedRoute") as? Map<String, Any>
+
+        checkPermissionAndBeginNavigation(wayPoints, predefinedRoute)
     }
 
-    private fun checkPermissionAndBeginNavigation(wayPoints: List<Waypoint>) {
+    private fun checkPermissionAndBeginNavigation(wayPoints: List<Waypoint>, predefinedRoute: Map<String, Any>?) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             val haspermission =
                 currentActivity?.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)
@@ -213,15 +216,15 @@ class FlutterMapboxNavigationPlugin : FlutterPlugin, MethodCallHandler,
                     arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
                     PERMISSION_REQUEST_CODE
                 )
-                beginNavigation(wayPoints)
+                beginNavigation(wayPoints, predefinedRoute)
             } else
-                beginNavigation(wayPoints)
+                beginNavigation(wayPoints, predefinedRoute)
         } else
-            beginNavigation(wayPoints)
+            beginNavigation(wayPoints, predefinedRoute)
     }
 
-    private fun beginNavigation(wayPoints: List<Waypoint>) {
-        NavigationLauncher.startNavigation(currentActivity, wayPoints)
+    private fun beginNavigation(wayPoints: List<Waypoint>, predefinedRoute: Map<String, Any>?) {
+        NavigationLauncher.startNavigation(currentActivity, wayPoints, predefinedRoute)
     }
 
     private fun addWayPointsToNavigation(
@@ -296,7 +299,7 @@ class FlutterMapboxNavigationPlugin : FlutterPlugin, MethodCallHandler,
                         }
                         if (haspermission == PackageManager.PERMISSION_GRANTED) {
                             if (wayPoints.isNotEmpty())
-                                beginNavigation(wayPoints)
+                                beginNavigation(wayPoints, predefinedRoute)
                         }
                         // Not all permissions granted. Show some message and return.
                         return
