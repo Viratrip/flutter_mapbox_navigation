@@ -43,6 +43,10 @@ public class FlutterMapboxNavigationPlugin: NavigationFactory, FlutterPlugin {
         {
             startNavigation(arguments: arguments, result: result)
         }
+        else if(call.method == "updateRoute")
+        {
+            updateRoute(arguments: arguments, result: result)
+        }
         else if(call.method == "addWayPoints")
         {
             addWayPoints(arguments: arguments, result: result)

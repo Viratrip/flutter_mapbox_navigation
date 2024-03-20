@@ -36,7 +36,7 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
     var _animateBuildRoute = true
     var _longPressDestinationEnabled = true
     var _alternatives = true
-    var _shouldReRoute = false
+    var _shouldReRoute = true
     var _showReportFeedbackButton = true
     var _showEndOfRouteFeedback = true
     var _enableOnMapTapCallback = false
@@ -63,6 +63,34 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
         
         startNavigationWithWayPoints(wayPoints: _wayPoints,predefinedRoutes: nil, flutterResult: result, isUpdatingWaypoints: true)
     }
+
+    func updateRoute(arguments: NSDictionary?, result: @escaping FlutterResult)
+        {
+
+            guard var locations = getLocationsFromFlutterArgument(arguments: arguments) else { return }
+
+            var nextIndex = 1
+            for loc in locations
+            {
+                let wayPoint = Waypoint(coordinate: CLLocationCoordinate2D(latitude: loc.latitude!, longitude: loc.longitude!), name: loc.name)
+                wayPoint.separatesLegs = !loc.isSilent
+                if (_wayPoints.count >= nextIndex) {
+                    _wayPoints.insert(wayPoint, at: nextIndex)
+                }
+                else {
+                    _wayPoints.append(wayPoint)
+                }
+                nextIndex += 1
+            }
+
+            let predefinedRoute = arguments?["predefinedRoute"] as? NSDictionary
+            var dataString: String?
+            if (predefinedRoute != nil) {
+                let jsonData: NSData? = try? JSONSerialization.data(withJSONObject: predefinedRoute!, options: JSONSerialization.WritingOptions.prettyPrinted) as NSData
+                dataString = NSString(data: jsonData! as Data, encoding: NSUTF8StringEncoding)! as String
+            }
+            startNavigationWithWayPoints(wayPoints: _wayPoints,predefinedRoutes: dataString, flutterResult: result, isUpdatingWaypoints: true)
+        }
     
     func startFreeDrive(arguments: NSDictionary?, result: @escaping FlutterResult)
     {
@@ -146,75 +174,85 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
                                                                             customRoutingProvider: NavigationSettings.shared.directions,
                                                                             credentials: NavigationSettings.shared.directions.credentials,
                                                                             simulating: simulationMode)
+                            // Do not try to find a better route every 2 mins
+                            navigationService.router.reroutesProactively = false
 
                             let strongSelf = self
                             strongSelf._options = _options
 
-                    var dayStyle = CustomDayStyle()
-                    if(strongSelf._mapStyleUrlDay != nil){
-                        dayStyle = CustomDayStyle(url: strongSelf._mapStyleUrlDay)
-                    }
-                    let nightStyle = CustomNightStyle()
-                    if(strongSelf._mapStyleUrlNight != nil){
-                        nightStyle.mapStyleURL = URL(string: strongSelf._mapStyleUrlNight!)!
-                    }
-                    let navigationOptions = NavigationOptions(styles: [dayStyle, nightStyle], navigationService: navigationService)
-
-                    strongSelf.startNavigation(routeResponse: routeResponse, options: _options!, navOptions: navigationOptions)
-
+                            var dayStyle = CustomDayStyle()
+                            if(strongSelf._mapStyleUrlDay != nil){
+                                dayStyle = CustomDayStyle(url: strongSelf._mapStyleUrlDay)
+                            }
+                            let nightStyle = CustomNightStyle()
+                            if(strongSelf._mapStyleUrlNight != nil){
+                                nightStyle.mapStyleURL = URL(string: strongSelf._mapStyleUrlNight!)!
+                            }
+                            let navigationOptions = NavigationOptions(styles: [dayStyle, nightStyle], navigationService: navigationService)
+                            if (isUpdatingWaypoints) {
+                                strongSelf._navigationViewController?.navigationService.router.updateRoute(with: IndexedRouteResponse(routeResponse: routeResponse, routeIndex: 0), routeOptions: strongSelf._options) { success in
+                                    if (success) {
+                                        flutterResult("true")
+                                    } else {
+                                        flutterResult("failed to add stop")
                                     }
                                 }
-                                catch let error {
-                                    flutterResult(error)
-                                }
                             } else {
-                                Directions.shared.calculate(_options!) { [weak self](session, result) in
-                                    guard let strongSelf = self else { return }
-                                    switch result {
-                                    case .failure(let error):
-                                        strongSelf.sendEvent(eventType: MapBoxEventType.route_build_failed)
-                                        flutterResult("An error occured while calculating the route \(error.localizedDescription)")
-                                    case .success(let response):
-                                        guard let routes = response.routes else { return }
-                                        //TODO: if more than one route found, give user option to select one: DOES NOT WORK
-                                        if(routes.count > 1 && strongSelf.ALLOW_ROUTE_SELECTION)
-                                        {
-                                            //show map to select a specific route
-                                            strongSelf._routes = routes
-                                            let routeOptionsView = RouteOptionsViewController(routes: routes, options: strongSelf._options!)
+                                strongSelf.startNavigation(routeResponse: routeResponse, options: _options!, navOptions: navigationOptions)
+                            }
 
-                                            let flutterViewController = UIApplication.shared.delegate?.window??.rootViewController as! FlutterViewController
-                                            flutterViewController.present(routeOptionsView, animated: true, completion: nil)
-                                        }
-                                        else
-                                        {
-                                            let navigationService = MapboxNavigationService(routeResponse: response, routeIndex: 0, routeOptions: strongSelf._options!, simulating: simulationMode)
-                                            var dayStyle = CustomDayStyle()
-                                            if(strongSelf._mapStyleUrlDay != nil){
-                                                dayStyle = CustomDayStyle(url: strongSelf._mapStyleUrlDay)
-                                            }
-                                            let nightStyle = CustomNightStyle()
-                                            if(strongSelf._mapStyleUrlNight != nil){
-                                                nightStyle.mapStyleURL = URL(string: strongSelf._mapStyleUrlNight!)!
-                                            }
-                                            let navigationOptions = NavigationOptions(styles: [dayStyle, nightStyle], navigationService: navigationService)
-                                            if (isUpdatingWaypoints) {
-                                                strongSelf._navigationViewController?.navigationService.router.updateRoute(with: IndexedRouteResponse(routeResponse: response, routeIndex: 0), routeOptions: strongSelf._options) { success in
-                                                    if (success) {
-                                                        flutterResult("true")
-                                                    } else {
-                                                        flutterResult("failed to add stop")
-                                                    }
+                        }
+                    } catch let error {
+                        flutterResult(error)
+                    }
+        } else {
+            // No predefined route, calculate route with Directions API
+            Directions.shared.calculate(_options!) { [weak self](session, result) in
+                guard let strongSelf = self else { return }
+                switch result {
+                case .failure(let error):
+                    strongSelf.sendEvent(eventType: MapBoxEventType.route_build_failed)
+                    flutterResult("An error occured while calculating the route \(error.localizedDescription)")
+                case .success(let response):
+                    guard let routes = response.routes else { return }
+                    //TODO: if more than one route found, give user option to select one: DOES NOT WORK
+                    if(routes.count > 1 && strongSelf.ALLOW_ROUTE_SELECTION)
+                    {
+                        //show map to select a specific route
+                        strongSelf._routes = routes
+                        let routeOptionsView = RouteOptionsViewController(routes: routes, options: strongSelf._options!)
+
+                        let flutterViewController = UIApplication.shared.delegate?.window??.rootViewController as! FlutterViewController
+                        flutterViewController.present(routeOptionsView, animated: true, completion: nil)
+                    }
+                    else
+                    {
+                        let navigationService = MapboxNavigationService(routeResponse: response, routeIndex: 0, routeOptions: strongSelf._options!, simulating: simulationMode)
+                        var dayStyle = CustomDayStyle()
+                        if(strongSelf._mapStyleUrlDay != nil){
+                            dayStyle = CustomDayStyle(url: strongSelf._mapStyleUrlDay)
+                        }
+                        let nightStyle = CustomNightStyle()
+                        if(strongSelf._mapStyleUrlNight != nil){
+                            nightStyle.mapStyleURL = URL(string: strongSelf._mapStyleUrlNight!)!
+                        }
+                        let navigationOptions = NavigationOptions(styles: [dayStyle, nightStyle], navigationService: navigationService)
+                        if (isUpdatingWaypoints) {
+                            strongSelf._navigationViewController?.navigationService.router.updateRoute(with: IndexedRouteResponse(routeResponse: response, routeIndex: 0), routeOptions: strongSelf._options) { success in
+                                if (success) {
+                                    flutterResult("true")
+                                } else {
+                                    flutterResult("failed to add stop")
+                                }
                             }
                         }
-                    else {
-                        strongSelf.startNavigation(routeResponse: response, options: strongSelf._options!, navOptions: navigationOptions)
-                    }
+                        else {
+                            strongSelf.startNavigation(routeResponse: response, options: strongSelf._options!, navOptions: navigationOptions)
+                        }
                     }
                 }
             }
         }
-        
     }
     
     func startNavigation(routeResponse: RouteResponse, options: NavigationRouteOptions, navOptions: NavigationOptions)
@@ -228,9 +266,20 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
             self._navigationViewController!.navigationMapView!.localizeLabels()
             self._navigationViewController!.showsReportFeedback = _showReportFeedbackButton
             self._navigationViewController!.showsEndOfRouteFeedback = _showEndOfRouteFeedback
+            self._navigationViewController!.showsContinuousAlternatives = _alternatives
         }
         let flutterViewController = UIApplication.shared.delegate?.window??.rootViewController as! FlutterViewController
         flutterViewController.present(self._navigationViewController!, animated: true, completion: nil)
+    }
+
+    func updateRoute(routeResponse: RouteResponse, flutterResult: @escaping FlutterResult) {
+        self._navigationViewController?.navigationService.router.updateRoute(with: IndexedRouteResponse(routeResponse: routeResponse, routeIndex: 0), routeOptions: self._options) { success in
+                                    if (success) {
+                                        flutterResult("true")
+                                    } else {
+                                        flutterResult("failed to add stop")
+                                    }
+                                }
     }
     
     func setNavigationOptions(wayPoints: [Waypoint]) {
@@ -257,6 +306,7 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
         
         options.distanceMeasurementSystem = _voiceUnits == "imperial" ? .imperial : .metric
         options.locale = Locale(identifier: _language)
+        options.includesAlternativeRoutes = _alternatives
         _options = options
     }
     
@@ -489,6 +539,10 @@ extension NavigationFactory : NavigationViewControllerDelegate {
     
     public func navigationViewController(_ navigationViewController: NavigationViewController, shouldRerouteFrom location: CLLocation) -> Bool {
         return _shouldReRoute
+    }
+
+    public func navigationViewController(_ navigationViewController: NavigationViewController, shouldPreventReroutesWhenArrivingAt waypoint: Waypoint) -> Bool {
+        return true
     }
     
     public func navigationViewController(_ navigationViewController: NavigationViewController, didSubmitArrivalFeedback feedback: EndOfRouteFeedback) {

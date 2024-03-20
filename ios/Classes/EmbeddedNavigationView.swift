@@ -22,7 +22,7 @@ public class FlutterMapboxNavigationView : NavigationFactory, FlutterPlatformVie
     var routeOptions: NavigationRouteOptions?
     var navigationService: NavigationService!
 
-    var _mapInitialized = false;
+    var _mapInitialized = false
     var locationManager = CLLocationManager()
 
     private let passiveLocationManager = PassiveLocationManager()
@@ -239,18 +239,58 @@ public class FlutterMapboxNavigationView : NavigationFactory, FlutterPlatformVie
         routeOptions.includesAlternativeRoutes = _alternatives
         self.routeOptions = routeOptions
 
-        // Generate the route object and draw it on the map
-        _ = Directions.shared.calculate(routeOptions) { [weak self] (session, result) in
+        let predefinedRoutes = arguments?["predefinedRoute"] as? NSDictionary
+        if(predefinedRoutes != nil) {
+            let jsonData: NSData? = try? JSONSerialization.data(withJSONObject: predefinedRoutes!, options: JSONSerialization.WritingOptions.prettyPrinted) as NSData
+            let predefinedRoutes = NSString(data: jsonData! as Data, encoding: NSUTF8StringEncoding)! as String
+            let decoder = JSONDecoder()
+            decoder.userInfo = [.options: routeOptions]
 
-            guard case let .success(response) = result, let strongSelf = self else {
-                flutterResult(false)
-                self?.sendEvent(eventType: MapBoxEventType.route_build_failed)
-                return
+            do {
+                let simulationMode: SimulationMode = _simulateRoute ? .always : .never
+                let route: Route? = try decoder.decode(Route.self, from: predefinedRoutes.data(using: .utf8)!)
+
+
+                if let route = route {
+                    let routeResponse = RouteResponse(httpResponse: nil,
+                                                      identifier: "deserialized-route",
+                                                      routes: [route],
+                                                      waypoints: _wayPoints,
+                                                      options: .route(routeOptions),
+                                                      credentials: Directions.shared.credentials)
+
+                    let indexedRouteResponse = IndexedRouteResponse(routeResponse: routeResponse, routeIndex: 0)
+                    let navigationService = MapboxNavigationService(indexedRouteResponse: indexedRouteResponse,
+                                                                    customRoutingProvider: NavigationSettings.shared.directions,
+                                                                    credentials: NavigationSettings.shared.directions.credentials,
+                                                                    simulating: simulationMode)
+                    // Do not try to find a better route every 2 mins
+                    navigationService.router.reroutesProactively = false
+
+                    let strongSelf = self
+                    strongSelf.routeResponse = routeResponse
+                    strongSelf.sendEvent(eventType: MapBoxEventType.route_built, data: strongSelf.encodeRouteResponse(response: routeResponse))
+                    strongSelf.navigationMapView?.showcase(routeResponse.routes!, routesPresentationStyle: .all(shouldFit: true), animated: true)
+                    flutterResult(true)
+                }
+            } catch let error {
+                flutterResult(error)
             }
-            strongSelf.routeResponse = response
-            strongSelf.sendEvent(eventType: MapBoxEventType.route_built, data: strongSelf.encodeRouteResponse(response: response))
-            strongSelf.navigationMapView?.showcase(response.routes!, routesPresentationStyle: .all(shouldFit: true), animated: true)
-            flutterResult(true)
+
+        } else {
+            // Generate the route object and draw it on the map
+            _ = Directions.shared.calculate(routeOptions) { [weak self] (session, result) in
+
+                guard case let .success(response) = result, let strongSelf = self else {
+                    flutterResult(false)
+                    self?.sendEvent(eventType: MapBoxEventType.route_build_failed)
+                    return
+                }
+                strongSelf.routeResponse = response
+                strongSelf.sendEvent(eventType: MapBoxEventType.route_built, data: strongSelf.encodeRouteResponse(response: response))
+                strongSelf.navigationMapView?.showcase(response.routes!, routesPresentationStyle: .all(shouldFit: true), animated: true)
+                flutterResult(true)
+            }
         }
     }
 
@@ -279,8 +319,10 @@ public class FlutterMapboxNavigationView : NavigationFactory, FlutterPlatformVie
                                                             routingProvider: MapboxRoutingProvider(.hybrid),
                                                             credentials: NavigationSettings.shared.directions.credentials,
                                                             locationSource: navLocationManager,
-                                                    simulating: self._simulateRoute ? .always : .onPoorGPS)
+                                                    simulating: self._simulateRoute ? .always : /*.never*/ .onPoorGPS)
         navigationService.delegate = self
+        // Do not try to find a better route every 2 mins
+        navigationService.router.reroutesProactively = false
 
         var dayStyle = CustomDayStyle()
         if(_mapStyleUrlDay != nil){
@@ -303,6 +345,7 @@ public class FlutterMapboxNavigationView : NavigationFactory, FlutterPlatformVie
 
         _navigationViewController!.showsReportFeedback = _showReportFeedbackButton
         _navigationViewController!.showsEndOfRouteFeedback = _showEndOfRouteFeedback
+        _navigationViewController!.showsContinuousAlternatives = _alternatives
 
         let flutterViewController = UIApplication.shared.delegate?.window?!.rootViewController as! FlutterViewController
         flutterViewController.addChild(_navigationViewController!)

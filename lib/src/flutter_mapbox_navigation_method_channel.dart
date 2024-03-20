@@ -79,6 +79,25 @@ class MethodChannelFlutterMapboxNavigation extends FlutterMapboxNavigationPlatfo
   }
 
   @override
+  Future<bool?> updateRoute({required List<WayPoint> wayPoints, Map<String, dynamic>? predefinedRoute}) async {
+    assert(wayPoints.length > 1, 'Error: WayPoints must be at least 2');
+
+    final pointList = _getPointListFromWayPoints(wayPoints);
+    var i = 0;
+    final wayPointMap = {for (var e in pointList) i++: e};
+
+    final args = <String, dynamic>{};
+    args['wayPoints'] = wayPointMap;
+    args['predefinedRoute'] = predefinedRoute;
+
+    _routeEventSubscription = routeEventsListener!.listen(_onProgressData);
+    final result = await methodChannel.invokeMethod('updateRoute', args);
+    if (result is bool) return result;
+    log(result.toString());
+    return false;
+  }
+
+  @override
   Future<dynamic> addWayPoints({required List<WayPoint> wayPoints}) async {
     assert(wayPoints.isNotEmpty, 'Error: WayPoints must be at least 1');
     final pointList = _getPointListFromWayPoints(wayPoints);

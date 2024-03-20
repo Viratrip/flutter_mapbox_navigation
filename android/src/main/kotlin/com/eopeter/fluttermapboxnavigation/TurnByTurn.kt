@@ -16,9 +16,12 @@ import com.eopeter.fluttermapboxnavigation.models.WaypointSet
 import com.eopeter.fluttermapboxnavigation.utilities.CustomInfoPanelEndNavButtonBinder
 import com.eopeter.fluttermapboxnavigation.utilities.PluginUtilities
 import com.google.gson.Gson
+import org.json.JSONObject
 import com.mapbox.maps.Style
 import com.mapbox.api.directions.v5.DirectionsCriteria
 import com.mapbox.api.directions.v5.models.RouteOptions
+import com.mapbox.api.directions.v5.models.DirectionsRoute
+import com.mapbox.api.directions.v5.models.DirectionsResponse
 import com.mapbox.geojson.Point
 import com.mapbox.navigation.base.extensions.applyDefaultNavigationOptions
 import com.mapbox.navigation.base.extensions.applyLanguageAndVoiceUnitOptions
@@ -27,6 +30,8 @@ import com.mapbox.navigation.base.route.NavigationRoute
 import com.mapbox.navigation.base.route.NavigationRouterCallback
 import com.mapbox.navigation.base.route.RouterFailure
 import com.mapbox.navigation.base.route.RouterOrigin
+import com.mapbox.navigation.base.route.RouteRefreshOptions
+import com.mapbox.navigation.base.route.RouteAlternativesOptions
 import com.mapbox.navigation.base.trip.model.RouteLegProgress
 import com.mapbox.navigation.base.trip.model.RouteProgress
 import com.mapbox.navigation.core.arrival.ArrivalObserver
@@ -55,6 +60,17 @@ open class TurnByTurn(
     open fun initNavigation() {
         val navigationOptions = NavigationOptions.Builder(this.context)
             .accessToken(this.token)
+            .routeAlternativesOptions(
+                RouteAlternativesOptions.Builder()
+                    // Did not find a better way to disable alternative routes
+                    .intervalMillis(1000*60*60*24*365)
+                    .build()
+            )
+            .routeRefreshOptions(
+                RouteRefreshOptions.Builder()
+                    .intervalMillis(1000*60*60*24*365)
+                    .build()
+            )
             .build()
 
         MapboxNavigationApp
@@ -114,61 +130,111 @@ open class TurnByTurn(
             val isSilent = point["IsSilent"] as Boolean
             this.addedWaypoints.add(Waypoint(Point.fromLngLat(longitude, latitude),isSilent))
         }
+        this.predefinedRoute = arguments?.get("predefinedRoute") as HashMap<String, *>
         this.getRoute(this.context)
         result.success(true)
     }
 
     private fun getRoute(context: Context) {
-        MapboxNavigationApp.current()!!.requestRoutes(
-            routeOptions = RouteOptions
-                .builder()
-                .applyDefaultNavigationOptions(navigationMode)
-                .applyLanguageAndVoiceUnitOptions(context)
-                .coordinatesList(this.addedWaypoints.coordinatesList())
-                .waypointIndicesList(this.addedWaypoints.waypointsIndices())
-                .waypointNamesList(this.addedWaypoints.waypointsNames())
-                .language(navigationLanguage)
-                .alternatives(alternatives)
-                .steps(true)
-                .voiceUnits(navigationVoiceUnits)
-                .bannerInstructions(bannerInstructionsEnabled)
-                .voiceInstructions(voiceInstructionsEnabled)
-                .build(),
-            callback = object : NavigationRouterCallback {
-                override fun onRoutesReady(
-                    routes: List<NavigationRoute>,
-                    routerOrigin: RouterOrigin
-                ) {
-                    this@TurnByTurn.currentRoutes = routes
-                    PluginUtilities.sendEvent(
-                        MapBoxEvents.ROUTE_BUILT,
-                        Gson().toJson(routes.map { it.directionsRoute.toJson() })
+        if(this.predefinedRoute!=null && this.predefinedRoute!!.isNotEmpty()) {
+            val jsonRoutes = JSONObject(predefinedRoute).toString()
+            val predefinedRouteObj = NavigationRoute.create(
+                DirectionsResponse.builder()
+                    .routes(
+                        listOf(
+                            DirectionsRoute.fromJson(jsonRoutes)
+                        )
                     )
-                    this@TurnByTurn.binding.navigationView.api.routeReplayEnabled(
-                        this@TurnByTurn.simulateRoute
-                    )
-                    this@TurnByTurn.binding.navigationView.api.startRoutePreview(routes)
-                    this@TurnByTurn.binding.navigationView.customizeViewBinders {
-                        this.infoPanelEndNavigationButtonBinder =
-                            CustomInfoPanelEndNavButtonBinder(activity)
+                    .code("200")
+                    .build(),
+                routeOptions = RouteOptions
+                    .builder()
+                    .applyDefaultNavigationOptions()
+                    .applyLanguageAndVoiceUnitOptions(context)
+                    .coordinatesList(this.addedWaypoints.coordinatesList())
+                    .waypointIndicesList(this.addedWaypoints.waypointsIndices())
+                    .waypointNamesList(this.addedWaypoints.waypointsNames())
+                    .language(navigationLanguage)
+                    .alternatives(alternatives)
+                    .steps(true)
+                    .voiceUnits(navigationVoiceUnits)
+                    .bannerInstructions(bannerInstructionsEnabled)
+                    .voiceInstructions(voiceInstructionsEnabled)
+                    .enableRefresh(false)
+                    .build(),
+            );
+
+            PluginUtilities.sendEvent(MapBoxEvents.ROUTE_BUILT)
+            if (predefinedRouteObj.isEmpty()) {
+                PluginUtilities.sendEvent(MapBoxEvents.ROUTE_BUILD_NO_ROUTES_FOUND)
+                return
+            }
+            this@TurnByTurn.currentRoutes = predefinedRouteObj
+            PluginUtilities.sendEvent(
+                MapBoxEvents.ROUTE_BUILT,
+                Gson().toJson(predefinedRouteObj.map { it.directionsRoute.toJson() })
+            )
+            this@TurnByTurn.binding.navigationView.api.routeReplayEnabled(
+                this@TurnByTurn.simulateRoute
+            )
+            this@TurnByTurn.binding.navigationView.api.startRoutePreview(predefinedRouteObj)
+            this@TurnByTurn.binding.navigationView.customizeViewBinders {
+                this.infoPanelEndNavigationButtonBinder =
+                    CustomInfoPanelEndNavButtonBinder(activity)
+            }
+        } else {
+            MapboxNavigationApp.current()!!.requestRoutes(
+                routeOptions = RouteOptions
+                    .builder()
+                    .applyDefaultNavigationOptions(navigationMode)
+                    .applyLanguageAndVoiceUnitOptions(context)
+                    .coordinatesList(this.addedWaypoints.coordinatesList())
+                    .waypointIndicesList(this.addedWaypoints.waypointsIndices())
+                    .waypointNamesList(this.addedWaypoints.waypointsNames())
+                    .language(navigationLanguage)
+                    .alternatives(alternatives)
+                    .steps(true)
+                    .voiceUnits(navigationVoiceUnits)
+                    .bannerInstructions(bannerInstructionsEnabled)
+                    .voiceInstructions(voiceInstructionsEnabled)
+                    .build(),
+                callback = object : NavigationRouterCallback {
+                    override fun onRoutesReady(
+                        routes: List<NavigationRoute>,
+                        routerOrigin: RouterOrigin
+                    ) {
+                        this@TurnByTurn.currentRoutes = routes
+                        PluginUtilities.sendEvent(
+                            MapBoxEvents.ROUTE_BUILT,
+                            Gson().toJson(routes.map { it.directionsRoute.toJson() })
+                        )
+                        this@TurnByTurn.binding.navigationView.api.routeReplayEnabled(
+                            this@TurnByTurn.simulateRoute
+                        )
+                        this@TurnByTurn.binding.navigationView.api.startRoutePreview(routes)
+                        this@TurnByTurn.binding.navigationView.customizeViewBinders {
+                            this.infoPanelEndNavigationButtonBinder =
+                                CustomInfoPanelEndNavButtonBinder(activity)
+                        }
+                    }
+
+                    override fun onFailure(
+                        reasons: List<RouterFailure>,
+                        routeOptions: RouteOptions
+                    ) {
+                        PluginUtilities.sendEvent(MapBoxEvents.ROUTE_BUILD_FAILED)
+                    }
+
+                    override fun onCanceled(
+                        routeOptions: RouteOptions,
+                        routerOrigin: RouterOrigin
+                    ) {
+                        PluginUtilities.sendEvent(MapBoxEvents.ROUTE_BUILD_CANCELLED)
                     }
                 }
+            )
+        }
 
-                override fun onFailure(
-                    reasons: List<RouterFailure>,
-                    routeOptions: RouteOptions
-                ) {
-                    PluginUtilities.sendEvent(MapBoxEvents.ROUTE_BUILD_FAILED)
-                }
-
-                override fun onCanceled(
-                    routeOptions: RouteOptions,
-                    routerOrigin: RouterOrigin
-                ) {
-                    PluginUtilities.sendEvent(MapBoxEvents.ROUTE_BUILD_CANCELLED)
-                }
-            }
-        )
     }
 
     private fun clearRoute(methodCall: MethodCall, result: MethodChannel.Result) {
@@ -218,7 +284,7 @@ open class TurnByTurn(
     }
 
     private fun finishNavigation(isOffRouted: Boolean = false) {
-        MapboxNavigationApp.current()!!.stopTripSession()
+        MapboxNavigationApp.current()?.stopTripSession()
         this.isNavigationCanceled = true
         PluginUtilities.sendEvent(MapBoxEvents.NAVIGATION_CANCELLED)
     }
@@ -361,6 +427,7 @@ open class TurnByTurn(
      * Helper class that keeps added waypoints and transforms them to the [RouteOptions] params.
      */
     private val addedWaypoints = WaypointSet()
+    private var predefinedRoute : HashMap<String, *>? = null
 
     // Config
     private var initialLatitude: Double? = null

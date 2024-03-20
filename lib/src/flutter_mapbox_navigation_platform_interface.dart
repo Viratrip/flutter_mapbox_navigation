@@ -70,6 +70,16 @@ abstract class FlutterMapboxNavigationPlatform extends PlatformInterface {
     throw UnimplementedError('startNavigation() has not been implemented.');
   }
 
+  ///Update the current navigation with new waypoints and predefined route
+  ///
+  /// [wayPoints] must not be null and have at least 1 item. The way points will
+  /// replace waypoints in the existing navigation
+  /// [predefinedRoute] The predefined route will replace the
+  /// current route in the existing route
+  Future<bool?> updateRoute({required List<WayPoint> wayPoints, Map<String, dynamic>? predefinedRoute}) async {
+    throw UnimplementedError('updateRoute() has not been implemented.');
+  }
+
   ///Adds waypoints or stops to an on-going navigation
   ///
   /// [wayPoints] must not be null and have at least 1 item. The way points will

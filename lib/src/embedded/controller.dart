@@ -29,19 +29,15 @@ class MapBoxNavigationViewController {
   late StreamSubscription<RouteEvent> _routeEventSubscription;
 
   ///Current Device OS Version
-  Future<String> get platformVersion => _methodChannel
-      .invokeMethod('getPlatformVersion')
-      .then((dynamic result) => result as String);
+  Future<String> get platformVersion => _methodChannel.invokeMethod('getPlatformVersion').then((dynamic result) => result as String);
 
   ///Total distance remaining in meters along route.
-  Future<double> get distanceRemaining => _methodChannel
-      .invokeMethod<double>('getDistanceRemaining')
-      .then((dynamic result) => result as double);
+  Future<double> get distanceRemaining =>
+      _methodChannel.invokeMethod<double>('getDistanceRemaining').then((dynamic result) => result as double);
 
   ///Total seconds remaining on all legs.
-  Future<double> get durationRemaining => _methodChannel
-      .invokeMethod<double>('getDurationRemaining')
-      .then((dynamic result) => result as double);
+  Future<double> get durationRemaining =>
+      _methodChannel.invokeMethod<double>('getDurationRemaining').then((dynamic result) => result as double);
 
   ///Build the Route Used for the Navigation
   ///
@@ -52,6 +48,7 @@ class MapBoxNavigationViewController {
   ///
   Future<bool> buildRoute({
     required List<WayPoint> wayPoints,
+    Map<String, dynamic>? predefinedRoute,
     MapBoxOptions? options,
   }) async {
     assert(wayPoints.length > 1, 'Error: WayPoints must be at least 2');
@@ -88,11 +85,10 @@ class MapBoxNavigationViewController {
     var args = <String, dynamic>{};
     if (options != null) args = options.toMap();
     args['wayPoints'] = wayPointMap;
+    args['predefinedRoute'] = predefinedRoute ?? <String, dynamic>{};
 
     _routeEventSubscription = _streamRouteEvent!.listen(_onProgressData);
-    return _methodChannel
-        .invokeMethod('buildRoute', args)
-        .then((dynamic result) => result as bool);
+    return _methodChannel.invokeMethod('buildRoute', args).then((dynamic result) => result as bool);
   }
 
   /// starts listening for events
@@ -146,9 +142,7 @@ class MapBoxNavigationViewController {
   }
 
   Stream<RouteEvent>? get _streamRouteEvent {
-    return _eventChannel
-        .receiveBroadcastStream()
-        .map((dynamic event) => _parseRouteEvent(event as String));
+    return _eventChannel.receiveBroadcastStream().map((dynamic event) => _parseRouteEvent(event as String));
   }
 
   RouteEvent _parseRouteEvent(String jsonString) {

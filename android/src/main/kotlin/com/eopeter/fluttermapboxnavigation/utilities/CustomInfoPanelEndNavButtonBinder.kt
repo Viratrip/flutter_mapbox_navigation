@@ -34,7 +34,8 @@ class CustomInfoPanelEndNavButtonBinder(
                 button.setOnClickListener {
                     mapboxNavigation.stopTripSession()
                     PluginUtilities.sendEvent(MapBoxEvents.NAVIGATION_CANCELLED)
-                    activity.finish()
+                    // Should not finish the activity in embedded navigation
+                    /*activity.finish()*/
                 }
             }
         }

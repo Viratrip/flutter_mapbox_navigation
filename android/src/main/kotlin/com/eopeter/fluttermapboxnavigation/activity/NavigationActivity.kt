@@ -261,6 +261,7 @@ class NavigationActivity : AppCompatActivity() {
                 .coordinatesList(waypointSet.coordinatesList())
                 .language(FlutterMapboxNavigationPlugin.navigationLanguage)
                 .alternatives(FlutterMapboxNavigationPlugin.showAlternateRoutes)
+                //.enableRefresh(false)
                 .build(),
         );
 

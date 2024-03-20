@@ -14,43 +14,15 @@ class SampleNavigationApp extends StatefulWidget {
 class _SampleNavigationAppState extends State<SampleNavigationApp> {
   String? _platformVersion;
   String? _instruction;
-  final _origin = WayPoint(
-      name: "Way Point 1",
-      latitude: 38.9111117447887,
-      longitude: -77.04012393951416,
-      isSilent: true);
-  final _stop1 = WayPoint(
-      name: "Way Point 2",
-      latitude: 38.91113678979344,
-      longitude: -77.03847169876099,
-      isSilent: true);
-  final _stop2 = WayPoint(
-      name: "Way Point 3",
-      latitude: 38.91040213277608,
-      longitude: -77.03848242759705,
-      isSilent: false);
-  final _stop3 = WayPoint(
-      name: "Way Point 4",
-      latitude: 38.909650771013034,
-      longitude: -77.03850388526917,
-      isSilent: true);
-  final _destination = WayPoint(
-      name: "Way Point 5",
-      latitude: 38.90894949285854,
-      longitude: -77.03651905059814,
-      isSilent: false);
+  final _origin = WayPoint(name: "Way Point 1", latitude: 43.55636567331075, longitude: 5.23748594860697, isSilent: true);
+  final _stop1 = WayPoint(name: "Way Point 2", latitude: 38.91113678979344, longitude: -77.03847169876099, isSilent: true);
+  final _stop2 = WayPoint(name: "Way Point 3", latitude: 38.91040213277608, longitude: -77.03848242759705, isSilent: false);
+  final _stop3 = WayPoint(name: "Way Point 4", latitude: 38.909650771013034, longitude: -77.03850388526917, isSilent: true);
+  final _destination = WayPoint(name: "Way Point 5", latitude: 43.557491966674014, longitude: 5.243517733767273, isSilent: false);
 
-  final _home = WayPoint(
-      name: "Home",
-      latitude: 37.77440680146262,
-      longitude: -122.43539772352648,
-      isSilent: false);
+  final _home = WayPoint(name: "Home", latitude: 43.5558991015458, longitude: 5.237194258376601, isSilent: false);
 
-  final _store = WayPoint(
-      name: "Store",
-      latitude: 37.76556957793795,
-      longitude: -122.42409811526268,
-      isSilent: false);
+  final _store = WayPoint(name: "Store", latitude: 37.76556957793795, longitude: -122.42409811526268, isSilent: false);
 
   bool _isMultipleStop = false;
   double? _distanceRemaining, _durationRemaining;
@@ -143,8 +115,7 @@ class _SampleNavigationAppState extends State<SampleNavigationApp> {
                             opt.bannerInstructionsEnabled = true;
                             opt.units = VoiceUnits.metric;
                             opt.language = "de-DE";
-                            await MapBoxNavigation.instance
-                                .startNavigation(wayPoints: wayPoints, options: opt);
+                            await MapBoxNavigation.instance.startNavigation(wayPoints: wayPoints, options: opt);
                           },
                         ),
                         const SizedBox(
@@ -171,13 +142,9 @@ class _SampleNavigationAppState extends State<SampleNavigationApp> {
                                     units: VoiceUnits.metric));
                             //after 10 seconds add a new stop
                             await Future.delayed(const Duration(seconds: 10));
-                            var stop = WayPoint(
-                                name: "Gas Station",
-                                latitude: 38.911176544398,
-                                longitude: -77.04014366543564,
-                                isSilent: false);
-                            MapBoxNavigation.instance
-                                .addWayPoints(wayPoints: [stop]);
+                            var stop =
+                                WayPoint(name: "Gas Station", latitude: 38.911176544398, longitude: -77.04014366543564, isSilent: false);
+                            MapBoxNavigation.instance.addWayPoints(wayPoints: [stop]);
                           },
                         ),
                         const SizedBox(
@@ -217,14 +184,10 @@ class _SampleNavigationAppState extends State<SampleNavigationApp> {
                                     wayPoints.add(_home);
                                     wayPoints.add(_store);
                                     _isMultipleStop = wayPoints.length > 2;
-                                    _controller?.buildRoute(
-                                        wayPoints: wayPoints,
-                                        options: _navigationOption);
+                                    _controller?.buildRoute(wayPoints: wayPoints, predefinedRoute: null, options: _navigationOption);
                                   }
                                 },
-                          child: Text(_routeBuilt && !_isNavigating
-                              ? "Clear Route"
-                              : "Build Route"),
+                          child: Text(_routeBuilt && !_isNavigating ? "Clear Route" : "Build Route"),
                         ),
                         const SizedBox(
                           width: 10,
@@ -254,8 +217,7 @@ class _SampleNavigationAppState extends State<SampleNavigationApp> {
                       onPressed: _inFreeDrive
                           ? null
                           : () async {
-                              _inFreeDrive =
-                                  await _controller?.startFreeDrive() ?? false;
+                              _inFreeDrive = await _controller?.startFreeDrive() ?? false;
                             },
                       child: const Text("Free Drive "),
                     ),
@@ -274,34 +236,27 @@ class _SampleNavigationAppState extends State<SampleNavigationApp> {
                       child: Padding(
                         padding: const EdgeInsets.all(10),
                         child: (Text(
-                          _instruction == null
-                              ? "Banner Instruction Here"
-                              : _instruction!,
+                          _instruction == null ? "Banner Instruction Here" : _instruction!,
                           style: const TextStyle(color: Colors.white),
                           textAlign: TextAlign.center,
                         )),
                       ),
                     ),
                     Padding(
-                      padding: const EdgeInsets.only(
-                          left: 20.0, right: 20, top: 20, bottom: 10),
+                      padding: const EdgeInsets.only(left: 20.0, right: 20, top: 20, bottom: 10),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: <Widget>[
                           Row(
                             children: <Widget>[
                               const Text("Duration Remaining: "),
-                              Text(_durationRemaining != null
-                                  ? "${(_durationRemaining! / 60).toStringAsFixed(0)} minutes"
-                                  : "---")
+                              Text(_durationRemaining != null ? "${(_durationRemaining! / 60).toStringAsFixed(0)} minutes" : "---")
                             ],
                           ),
                           Row(
                             children: <Widget>[
                               const Text("Distance Remaining: "),
-                              Text(_distanceRemaining != null
-                                  ? "${(_distanceRemaining! * 0.000621371).toStringAsFixed(1)} miles"
-                                  : "---")
+                              Text(_distanceRemaining != null ? "${(_distanceRemaining! * 0.000621371).toStringAsFixed(1)} miles" : "---")
                             ],
                           ),
                         ],
@@ -319,8 +274,7 @@ class _SampleNavigationAppState extends State<SampleNavigationApp> {
                 child: MapBoxNavigationView(
                     options: _navigationOption,
                     onRouteEvent: _onEmbeddedRouteEvent,
-                    onCreated:
-                        (MapBoxNavigationViewController controller) async {
+                    onCreated: (MapBoxNavigationViewController controller) async {
                       _controller = controller;
                       controller.initialize();
                     }),
