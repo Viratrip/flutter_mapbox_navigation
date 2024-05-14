@@ -147,6 +147,13 @@ class MapBoxNavigationViewController {
 
   RouteEvent _parseRouteEvent(String jsonString) {
     RouteEvent event;
+    // Fix invalid json returned by mapbox (data value is missing)
+    if (jsonString == '{  "eventType": "route_built",  "data": }') {
+      return RouteEvent(
+        eventType: MapBoxEvent.route_built,
+        data: null,
+      );
+    }
     final map = json.decode(jsonString) as Map<String, dynamic>;
     final progressEvent = RouteProgressEvent.fromJson(map);
     if (progressEvent.isProgressEvent!) {
