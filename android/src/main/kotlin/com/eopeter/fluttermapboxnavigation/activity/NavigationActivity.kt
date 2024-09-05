@@ -152,12 +152,14 @@ class NavigationActivity : AppCompatActivity() {
 
         registerReceiver(
             finishBroadcastReceiver,
-            IntentFilter(NavigationLauncher.KEY_STOP_NAVIGATION)
+            IntentFilter(NavigationLauncher.KEY_STOP_NAVIGATION),
+            ContextCompat.RECEIVER_NOT_EXPORTED
         )
 
         registerReceiver(
             addWayPointsBroadcastReceiver,
-            IntentFilter(NavigationLauncher.KEY_ADD_WAYPOINTS)
+            IntentFilter(NavigationLauncher.KEY_ADD_WAYPOINTS),
+            ContextCompat.RECEIVER_NOT_EXPORTED
         )
 
         // TODO set the style Uri
